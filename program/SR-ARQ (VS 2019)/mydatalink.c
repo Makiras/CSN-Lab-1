@@ -509,7 +509,7 @@ int main(int argc, char** argv) {
 			if (enable_ranged_ack) {
 				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
 					enable_ranged_ack = 0;
-					SPLIT_LEVEL = 1;
+					SPLIT_LEVEL = 2;
 					dbg_event("*****误码率较高,关闭范围ack功能,降低帧长度*****\n");
 				}
 			}
