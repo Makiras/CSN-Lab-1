@@ -22,6 +22,9 @@ unsigned char send_upperbound = 0;//发送窗口序号上界
 int SPLIT_LEVEL = 3;//可变帧长对package的分割等级,默认为3,也就是不分割
 static const int fragment_numbers[4] = { 8,4,2,1 }; //每个分割等级应该将一个package分成多少份
 
+int number_of_received_frames = 0;
+int number_of_broken_recived_frames = 0;
+int enable_ranged_ack = 1; //是否启用范围ack
 /* 全局变量结束~ */
 
 //返回当前可用的序号数
@@ -187,7 +190,7 @@ static void get_package_from_network(int split_level) {
 	int nums = fragment_numbers[split_level];
 	unsigned char available_nums = number_of_available_send_seq();
 	if (nums > available_nums) {
-		dbg_warning("当前发送序号下界为 %d 上界为 %d 可用数为 %d 当前分割登记下需要 %d 个可用序号 不能获取packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
+		//dbg_warning("当前发送序号下界为 %d 上界为 %d 可用数为 %d 当前分割登记下需要 %d 个可用序号 不能获取packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
 		return;
 	}
 	unsigned char* package_ptr = (unsigned char*)malloc(2048);
@@ -240,7 +243,8 @@ static void get_package_from_network(int split_level) {
 
 //发送ack(lazy) 如果是nak那么isack为0 是ack就为1
 static void send_ACKNAK(unsigned char seq, int is_ACK) {
-	if (isACKNAKdelayed) {
+
+	if (isACKNAKdelayed&&enable_ranged_ack) {
 		if (ACK_or_NAK == 1 && is_ACK == 1) {
 			if (!isACKNAKranged) {
 				if (seq == ACKNAKseq1 - 1) {
@@ -260,7 +264,7 @@ static void send_ACKNAK(unsigned char seq, int is_ACK) {
 					ACKNAKseq1 = seq;
 					return;
 				}
-				if (seq = ACKNAKseq2 + 1) {
+				if (seq == ACKNAKseq2 + 1) {
 					ACKNAKseq2 = seq;
 					return;
 				}
@@ -356,6 +360,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 
 //当得到framereceived事件时调用
 static void got_frame(void) {
+	number_of_received_frames += 1;
 	unsigned char* frame_ptr = (unsigned char*)malloc(2048);
 	//unsigned char watch[2048];
 	//unsigned char* frame_ptr = watch;
@@ -367,6 +372,7 @@ static void got_frame(void) {
 	//lprintf("length_of_frame %d \n", length_of_frame);
 	if (crc32(frame_ptr, length_of_frame) != 0) {
 		//校验失败
+		number_of_broken_recived_frames += 1;
 		if (((*frame_ptr) | IS_DATA)&&length_of_frame>6) {
 			unsigned char seq = *(frame_ptr + 1);
 			send_ACKNAK(seq, 0);//搏一搏,单车变摩托~
@@ -499,6 +505,15 @@ int main(int argc, char** argv) {
 	while (1) {
 		//lprintf("sendlower:%ud sendupper :%ud recvlower:%ud recvupper:%ud \n",send_lowerbound,send_upperbound,recv_lowerbound,recv_upperbound);
 		event = wait_for_event(&arg);
+		if (number_of_received_frames > 100) {
+			if (enable_ranged_ack) {
+				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
+					enable_ranged_ack = 0;
+					SPLIT_LEVEL = 1;
+					dbg_event("*****误码率较高,关闭范围ack功能,降低帧长度*****\n");
+				}
+			}
+		}
 		switch (event)
 		{
 		case NETWORK_LAYER_READY:
