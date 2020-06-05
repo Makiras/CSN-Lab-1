@@ -1,59 +1,59 @@
 #include "mydatalink.h"
 
-/* È«¾Ö±äÁ¿½âñîºÏÌ«Âé·³ÁË,È«Ğ´Ò»ÆğºÃÁË ·´ÕıÒ²²»»áÖØ¹¹ÁË~ */
-int isACKNAKdelayed = 0; //±ê×¢ÊÇ·ñÒÑ¾­´æÔÚ±»ÑÓ³ÙµÄack»ònak
-int ACK_or_NAK = 0; //±ê×¢±»ÑÓ³ÙµÄÊÇack»¹ÊÇnak ÈôÎª1ÊÇack,0ÊÇnak
-int isACKNAKranged = 0; //±ê×¢±»ÑÓ³ÙµÄÊÇ²»ÊÇ·¶Î§ack
-unsigned char ACKNAKseq1 = 0;//±»ÑÓ³ÙµÄĞòºÅ
-unsigned char ACKNAKseq2 = 0; //ÔÚ·¶Î§ackÖĞÓÃµÄ
+/* å…¨å±€å˜é‡è§£è€¦åˆå¤ªéº»çƒ¦äº†,å…¨å†™ä¸€èµ·å¥½äº† åæ­£ä¹Ÿä¸ä¼šé‡æ„äº†~ */
+int isACKNAKdelayed = 0; //æ ‡æ³¨æ˜¯å¦å·²ç»å­˜åœ¨è¢«å»¶è¿Ÿçš„ackæˆ–nak
+int ACK_or_NAK = 0; //æ ‡æ³¨è¢«å»¶è¿Ÿçš„æ˜¯ackè¿˜æ˜¯nak è‹¥ä¸º1æ˜¯ack,0æ˜¯nak
+int isACKNAKranged = 0; //æ ‡æ³¨è¢«å»¶è¿Ÿçš„æ˜¯ä¸æ˜¯èŒƒå›´ack
+unsigned char ACKNAKseq1 = 0;//è¢«å»¶è¿Ÿçš„åºå·
+unsigned char ACKNAKseq2 = 0; //åœ¨èŒƒå›´ackä¸­ç”¨çš„
 
-unsigned char* recv_buffer[RECVWINDOW]; //½ÓÊÕ»º³åÇøbuffer Ö»´æµÄÊÇÖ¸Õë,¼ÇµÃÈ«²¿³õÊ¼»¯ÎªNULL
-int recv_buffer_lengthes[RECVWINDOW]; //¼ÇÂ¼³¤¶È ¼ÇµÃ±ğÍüÁË³õÊ¼»¯
-unsigned char* send_buffer[SENDWINDOW]; //·¢ËÍ»º³åÇøbuffer
-int send_buffer_lengthes[SENDWINDOW];//·¢ËÍ»º³åÇøÃ¿Ö¡µÄ³¤¶È
-int is_sent[SENDWINDOW];//±ê¼ÇÊÇ·ñÒÑ¾­·¢ËÍ Îª1ÊÇÒÑ·¢ËÍ 0ÊÇÎ´·¢ËÍ Ó¦¸ÃÈ«²¿³õÊ¼»¯Îª1
+unsigned char* recv_buffer[RECVWINDOW]; //æ¥æ”¶ç¼“å†²åŒºbuffer åªå­˜çš„æ˜¯æŒ‡é’ˆ,è®°å¾—å…¨éƒ¨åˆå§‹åŒ–ä¸ºNULL
+int recv_buffer_lengthes[RECVWINDOW]; //è®°å½•é•¿åº¦ è®°å¾—åˆ«å¿˜äº†åˆå§‹åŒ–
+unsigned char* send_buffer[SENDWINDOW]; //å‘é€ç¼“å†²åŒºbuffer
+int send_buffer_lengthes[SENDWINDOW];//å‘é€ç¼“å†²åŒºæ¯å¸§çš„é•¿åº¦
+int is_sent[SENDWINDOW];//æ ‡è®°æ˜¯å¦å·²ç»å‘é€ ä¸º1æ˜¯å·²å‘é€ 0æ˜¯æœªå‘é€ åº”è¯¥å…¨éƒ¨åˆå§‹åŒ–ä¸º1
 
-unsigned char recv_lowerbound = 0;//½ÓÊÕ´°¿ÚĞòºÅÏÂ½ç
-unsigned char recv_upperbound = RECVWINDOW;//½ÓÊÕ´°¿ÚÉÏ½ç Ç°±Õºó¿ª
+unsigned char recv_lowerbound = 0;//æ¥æ”¶çª—å£åºå·ä¸‹ç•Œ
+unsigned char recv_upperbound = RECVWINDOW;//æ¥æ”¶çª—å£ä¸Šç•Œ å‰é—­åå¼€
 
-unsigned char send_lowerbound = 0;//·¢ËÍ´°¿ÚĞòºÅÏÂ½ç
-unsigned char send_upperbound = 0;//·¢ËÍ´°¿ÚĞòºÅÉÏ½ç
+unsigned char send_lowerbound = 0;//å‘é€çª—å£åºå·ä¸‹ç•Œ
+unsigned char send_upperbound = 0;//å‘é€çª—å£åºå·ä¸Šç•Œ
 
-int SPLIT_LEVEL = 3;//¿É±äÖ¡³¤¶ÔpackageµÄ·Ö¸îµÈ¼¶,Ä¬ÈÏÎª3,Ò²¾ÍÊÇ²»·Ö¸î
-static const int fragment_numbers[4] = { 8,4,2,1 }; //Ã¿¸ö·Ö¸îµÈ¼¶Ó¦¸Ã½«Ò»¸öpackage·Ö³É¶àÉÙ·İ
+int SPLIT_LEVEL = 3;//å¯å˜å¸§é•¿å¯¹packageçš„åˆ†å‰²ç­‰çº§,é»˜è®¤ä¸º3,ä¹Ÿå°±æ˜¯ä¸åˆ†å‰²
+static const int fragment_numbers[4] = { 8,4,2,1 }; //æ¯ä¸ªåˆ†å‰²ç­‰çº§åº”è¯¥å°†ä¸€ä¸ªpackageåˆ†æˆå¤šå°‘ä»½
 
 int number_of_received_frames = 0;
 int number_of_broken_recived_frames = 0;
-int enable_ranged_ack = 1; //ÊÇ·ñÆôÓÃ·¶Î§ack
-/* È«¾Ö±äÁ¿½áÊø~ */
+int enable_ranged_ack = 1; //æ˜¯å¦å¯ç”¨èŒƒå›´ack
+/* å…¨å±€å˜é‡ç»“æŸ~ */
 
-//·µ»Øµ±Ç°¿ÉÓÃµÄĞòºÅÊı
+//è¿”å›å½“å‰å¯ç”¨çš„åºå·æ•°
 static unsigned char number_of_available_send_seq() {
 	return (SENDWINDOW - (send_upperbound - send_lowerbound));
 }
 
-//ÅĞ¶ÏĞòºÅÊÇ·ñÔÚÆÚÍûÖµÖ®¼ä,Ç°±Õºó¿ª Èô²»ÔÚ·µ»Ø0 ·ñÔò·µ»Ø1
+//åˆ¤æ–­åºå·æ˜¯å¦åœ¨æœŸæœ›å€¼ä¹‹é—´,å‰é—­åå¼€ è‹¥ä¸åœ¨è¿”å›0 å¦åˆ™è¿”å›1
 static int between(unsigned char L, unsigned char H, unsigned char mid) {
-	if (L < H) { //×îÒ»°ãµÄÇé¿öÏÂ
+	if (L < H) { //æœ€ä¸€èˆ¬çš„æƒ…å†µä¸‹
 		return (L <= mid && mid < H);
 	}
 	else if (L > H) {
 		return (L <= mid || mid < H);
 	}
-	else return 0; //Õâ¸öÊ±ºòLHÏàµÈ,Ã»ÓĞÆÚÍûÖµ
+	else return 0; //è¿™ä¸ªæ—¶å€™LHç›¸ç­‰,æ²¡æœ‰æœŸæœ›å€¼
 }
 
- //ÎªÊı¾İÖ¡Ìí¼ÓCRCĞ£ÑéºÍ£¬È»ºó½»¸¶¸øÎïÀí²ã
+ //ä¸ºæ•°æ®å¸§æ·»åŠ CRCæ ¡éªŒå’Œï¼Œç„¶åäº¤ä»˜ç»™ç‰©ç†å±‚
 static void put_frame(unsigned char* frame, int len)
 {
 	*(unsigned int*)(frame + len) = crc32(frame, len);
 	send_frame(frame, len + 4);
 }
 
-//Á¢¼´·¢ËÍack»òÕßnak¶ÌÖ¡,Çå¿ÕacknakÑÓ³Ù
+//ç«‹å³å‘é€ackæˆ–è€…nakçŸ­å¸§,æ¸…ç©ºacknakå»¶è¿Ÿ
 static void flush_ACKNAK_delay(void) {
-	if (!isACKNAKdelayed) { //´íÎóµÄµ÷ÓÃÁË Ö±½Ó·µ»Ø
-		//dbg_warning("´íÎóµØµ÷ÓÃÁËacknakË¢ĞÂº¯Êı,Ã»ÓĞĞèÒªÁ¢¼´·¢ËÍµÄacknak¶ÌÖ¡.\n");
+	if (!isACKNAKdelayed) { //é”™è¯¯çš„è°ƒç”¨äº† ç›´æ¥è¿”å›
+		//dbg_warning("é”™è¯¯åœ°è°ƒç”¨äº†acknakåˆ·æ–°å‡½æ•°,æ²¡æœ‰éœ€è¦ç«‹å³å‘é€çš„acknakçŸ­å¸§.\n");
 		stop_ack_timer();
 		isACKNAKdelayed = 0;
 		isACKNAKranged = 0;
@@ -61,56 +61,56 @@ static void flush_ACKNAK_delay(void) {
 	}
 	unsigned char* frame_ptr = NULL;
 	if (ACK_or_NAK == 0) {
-		//·¢ËÍnak¶ÌÖ¡
+		//å‘é€nakçŸ­å¸§
 		frame_ptr = (unsigned char*)malloc(6);
 		if (frame_ptr == NULL) {
-			dbg_warning("ÔÚ·¢ËÍNAK¶ÌÖ¡Ê±ÉêÇëÄÚ´æÊ§°Ü.\n");
+			dbg_warning("åœ¨å‘é€NAKçŸ­å¸§æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 			exit(-1);
 		}
 		*(frame_ptr) = NAK;
 		*(frame_ptr + 1) = ACKNAKseq1;
 		put_frame(frame_ptr, 2);
-		dbg_frame("·¢ËÍnak ĞòºÅÎª%d.\n",ACKNAKseq1);
+		dbg_frame("å‘é€nak åºå·ä¸º%d.\n",ACKNAKseq1);
 	}
 	else {
-		//·¢ËÍack
+		//å‘é€ack
 		frame_ptr = (unsigned char*)malloc(7);
 		if (frame_ptr == NULL) {
-			dbg_warning("ÔÚ·¢ËÍACK¶ÌÖ¡Ê±ÉêÇëÄÚ´æÊ§°Ü.\n");
+			dbg_warning("åœ¨å‘é€ACKçŸ­å¸§æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 			exit(-1);
 		}
 		if (isACKNAKranged) {
-			//·¢ËÍ·¶Î§ack
+			//å‘é€èŒƒå›´ack
 			*(frame_ptr) = ACK | ACK_RANGED;
 			*(frame_ptr + 1) = ACKNAKseq1;
 			*(frame_ptr + 2) = ACKNAKseq2;
 			put_frame(frame_ptr, 3);
-			dbg_frame("·¢ËÍ·¶Î§ack ĞòºÅÎª%d - %d.\n", ACKNAKseq1,ACKNAKseq2);
+			dbg_frame("å‘é€èŒƒå›´ack åºå·ä¸º%d - %d.\n", ACKNAKseq1,ACKNAKseq2);
 		}
 		else {
-			//·¢ËÍÆÕÍ¨ack¶ÌÖ¡
+			//å‘é€æ™®é€šackçŸ­å¸§
 			*(frame_ptr) = ACK;
 			*(frame_ptr + 1) = ACKNAKseq1;
 			put_frame(frame_ptr, 2);
-			dbg_event("»Ø¸´ack¶ÌÖ¡ id:%d.\n", ACKNAKseq1);
+			dbg_event("å›å¤ackçŸ­å¸§ id:%d.\n", ACKNAKseq1);
 		}
 	}
 	stop_ack_timer();
 	isACKNAKdelayed = 0;
-	isACKNAKranged = 0; //Çå¿ÕacknakÑÓ³Ù
+	isACKNAKranged = 0; //æ¸…ç©ºacknakå»¶è¿Ÿ
 	return;
 }
 
-//´Ó·¢ËÍ¶ÓÁĞÀïÃæÈ¡Ò»Ö¡·¢ËÍµ½ÎïÀí²ã,ÔÚµÃµ½pysicallayerreadyĞÅºÅÊ±µ÷ÓÃ
+//ä»å‘é€é˜Ÿåˆ—é‡Œé¢å–ä¸€å¸§å‘é€åˆ°ç‰©ç†å±‚,åœ¨å¾—åˆ°pysicallayerreadyä¿¡å·æ—¶è°ƒç”¨
 static void send_frame_to_physical() {
 	unsigned char index = send_lowerbound;
 	while (index != send_upperbound) {
-		if (is_sent[index % SENDWINDOW] == 0)break; //µÃµ½¶ÓÁĞÀï×îÇ°ÃæµÄÎ´·¢ËÍÖ¡
+		if (is_sent[index % SENDWINDOW] == 0)break; //å¾—åˆ°é˜Ÿåˆ—é‡Œæœ€å‰é¢çš„æœªå‘é€å¸§
 		index++;
 	}
 
 	if (index == send_upperbound) {
-		//dbg_event("ÔÚÃ»ÓĞ¿É·¢ËÍµÄÖ¡µÄÊ±ºòµ÷ÓÃÁËsend_frame_to_physical.\n");
+		//dbg_event("åœ¨æ²¡æœ‰å¯å‘é€çš„å¸§çš„æ—¶å€™è°ƒç”¨äº†send_frame_to_physical.\n");
 		return;
 	}
 
@@ -118,36 +118,36 @@ static void send_frame_to_physical() {
 	unsigned char* frame_ptr = send_buffer[index % SENDWINDOW];
 	int length_of_frame = send_buffer_lengthes[index % SENDWINDOW];
 	if (frame_ptr == NULL) {
-		dbg_warning("ÔÚ·¢ËÍ½»¸¶ÎïÀí²ãÊ±Óöµ½ÁË¿ÕÖ¸Õë(Äã²»¸Ã¿´µ½ÕâÌõÏûÏ¢µÄ).\n");
+		dbg_warning("åœ¨å‘é€äº¤ä»˜ç‰©ç†å±‚æ—¶é‡åˆ°äº†ç©ºæŒ‡é’ˆ(ä½ ä¸è¯¥çœ‹åˆ°è¿™æ¡æ¶ˆæ¯çš„).\n");
 		return;
 	}
 	if (length_of_frame < 3) {
-		dbg_warning("ÔÚ½»¸¶ÎïÀí²ãÊÇÓöµ½ÁË´íÎóµÄ³¤¶È(Ğ¡ÓÚ3).\n");
+		dbg_warning("åœ¨äº¤ä»˜ç‰©ç†å±‚æ˜¯é‡åˆ°äº†é”™è¯¯çš„é•¿åº¦(å°äº3).\n");
 		return;
 	}
 	unsigned char* frame_to_physical_ptr = (unsigned char*)malloc(length_of_frame + 6+16);
 	if (frame_to_physical_ptr == NULL) {
-		dbg_warning("ÔÚ½«·¢ËÍ»º³åÇøµÄÖ¡·¢ËÍµ½ÎïÀí²ãÊ±ÉêÇëÄÚ´æÊ§°Ü.\n");
+		dbg_warning("åœ¨å°†å‘é€ç¼“å†²åŒºçš„å¸§å‘é€åˆ°ç‰©ç†å±‚æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 		exit(-1);
 	}
 	memcpy(frame_to_physical_ptr, frame_ptr, length_of_frame+2);
 	if (!isACKNAKdelayed) {
-		//²âÊÔÓÃ
+		//æµ‹è¯•ç”¨
 		unsigned char frame_to_physical[1024];
 		memcpy(frame_to_physical, frame_to_physical_ptr, length_of_frame + 2);
 
 
 		put_frame(frame_to_physical_ptr, length_of_frame+2);
-		dbg_frame("ÒÑ·¢ËÍĞòºÅÎª %d µÄÒ»Ö¡ÖÁÎïÀí²ã. Ã»ÓĞĞ¯´øack,nak.\n", *(frame_to_physical_ptr + 1));
+		dbg_frame("å·²å‘é€åºå·ä¸º %d çš„ä¸€å¸§è‡³ç‰©ç†å±‚. æ²¡æœ‰æºå¸¦ack,nak.\n", *(frame_to_physical_ptr + 1));
 	}
 	else {
 		*frame_to_physical_ptr |= IS_PIGGYBACKING;
 		if (ACK_or_NAK == 0) {
-			//ÉÓ´øÒ»¸önakĞÅÏ¢
+			//æå¸¦ä¸€ä¸ªnakä¿¡æ¯
 			*frame_to_physical_ptr |= NAK;
 			*(frame_to_physical_ptr + length_of_frame+2) = ACKNAKseq1;
 			put_frame(frame_to_physical_ptr, length_of_frame + 1+2);
-			dbg_frame("ÒÑ·¢ËÍĞòºÅÎª %d µÄÒ»Ö¡ÖÁÎïÀí²ã.\n Ğ¯´øÁËĞòºÅÎª %d µÄnak.\n", *(frame_to_physical_ptr + 1),ACKNAKseq1);
+			dbg_frame("å·²å‘é€åºå·ä¸º %d çš„ä¸€å¸§è‡³ç‰©ç†å±‚.\n æºå¸¦äº†åºå·ä¸º %d çš„nak.\n", *(frame_to_physical_ptr + 1),ACKNAKseq1);
 		}
 		else {
 			if (isACKNAKranged) {
@@ -155,13 +155,13 @@ static void send_frame_to_physical() {
 				*(frame_to_physical_ptr + length_of_frame+2) = ACKNAKseq1;
 				*(frame_to_physical_ptr + length_of_frame +2+ 1) = ACKNAKseq2;
 				put_frame(frame_to_physical_ptr, length_of_frame + 2 +2);
-				dbg_frame("ÒÑ·¢ËÍĞòºÅÎª %d µÄÒ»Ö¡ÖÁÎïÀí²ã.\n Ğ¯´øÁËĞòºÅÎª %d - %d µÄ·¶Î§ack.\n", *(frame_to_physical_ptr + 1), ACKNAKseq1, ACKNAKseq2);
+				dbg_frame("å·²å‘é€åºå·ä¸º %d çš„ä¸€å¸§è‡³ç‰©ç†å±‚.\n æºå¸¦äº†åºå·ä¸º %d - %d çš„èŒƒå›´ack.\n", *(frame_to_physical_ptr + 1), ACKNAKseq1, ACKNAKseq2);
 			}
 			else {
 				*frame_to_physical_ptr |= ACK;
 				*(frame_to_physical_ptr + length_of_frame+2) = ACKNAKseq1;
 				put_frame(frame_to_physical_ptr, length_of_frame + 1+2);
-				dbg_frame("ÒÑ·¢ËÍĞòºÅÎª %d µÄÒ»Ö¡ÖÁÎïÀí²ã.\n Ğ¯´øÁËĞòºÅÎª %d µÄack.\n", *(frame_to_physical_ptr + 1 ), ACKNAKseq1);
+				dbg_frame("å·²å‘é€åºå·ä¸º %d çš„ä¸€å¸§è‡³ç‰©ç†å±‚.\n æºå¸¦äº†åºå·ä¸º %d çš„ack.\n", *(frame_to_physical_ptr + 1 ), ACKNAKseq1);
 			}
 		}
 		isACKNAKdelayed = 0;
@@ -172,30 +172,30 @@ static void send_frame_to_physical() {
 	free(frame_to_physical_ptr);
 }
 
-//Èç¹ûdatatimer³¬Ê±,µ÷ÓÃ´Ëº¯Êı
+//å¦‚æœdatatimerè¶…æ—¶,è°ƒç”¨æ­¤å‡½æ•°
 static void data_timer_timeout(unsigned char timer_id) {
 	stop_timer(timer_id);
 	unsigned char* frame_ptr = send_buffer[timer_id];
 	if (frame_ptr == NULL) {
-		dbg_warning("´íÎóµÄÆô¶¯ÁËidÎª %d µÄtimer³¬Ê±º¯Êı,Çë¼ì²é³ÌĞòÔËĞĞÂß¼­.\n", timer_id);
+		dbg_warning("é”™è¯¯çš„å¯åŠ¨äº†idä¸º %d çš„timerè¶…æ—¶å‡½æ•°,è¯·æ£€æŸ¥ç¨‹åºè¿è¡Œé€»è¾‘.\n", timer_id);
 		return;
 	}
 	unsigned char seq = *(frame_ptr + 1);
-	dbg_frame("±àºÅÎª %d µÄdatatimer³¬Ê±, ¶ÔÓ¦µÄÖ¡ĞòºÅÎª %d",timer_id,seq);
-	is_sent[timer_id] = 0; //Ê¹ÆäÖØĞÂ·¢ËÍ
+	dbg_frame("ç¼–å·ä¸º %d çš„datatimerè¶…æ—¶, å¯¹åº”çš„å¸§åºå·ä¸º %d",timer_id,seq);
+	is_sent[timer_id] = 0; //ä½¿å…¶é‡æ–°å‘é€
 }
 
-//µ±µÃµ½networklayerreadyÊÂ¼şÊ±µ÷ÓÃ
+//å½“å¾—åˆ°networklayerreadyäº‹ä»¶æ—¶è°ƒç”¨
 static void get_package_from_network(int split_level) {
 	int nums = fragment_numbers[split_level];
 	unsigned char available_nums = number_of_available_send_seq();
 	if (nums > available_nums) {
-		//dbg_warning("µ±Ç°·¢ËÍĞòºÅÏÂ½çÎª %d ÉÏ½çÎª %d ¿ÉÓÃÊıÎª %d µ±Ç°·Ö¸îµÇ¼ÇÏÂĞèÒª %d ¸ö¿ÉÓÃĞòºÅ ²»ÄÜ»ñÈ¡packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
+		//dbg_warning("å½“å‰å‘é€åºå·ä¸‹ç•Œä¸º %d ä¸Šç•Œä¸º %d å¯ç”¨æ•°ä¸º %d å½“å‰åˆ†å‰²ç™»è®°ä¸‹éœ€è¦ %d ä¸ªå¯ç”¨åºå· ä¸èƒ½è·å–packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
 		return;
 	}
 	unsigned char* package_ptr = (unsigned char*)malloc(2048);
 	if (package_ptr == NULL) {
-		dbg_warning("ÔÚ»ñÈ¡ÍøÂç²ãpacketÊ±ÉêÇëÄÚ´æÊ§°Ü.\n");
+		dbg_warning("åœ¨è·å–ç½‘ç»œå±‚packetæ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 		exit(-1);
 	}
 
@@ -213,7 +213,7 @@ static void get_package_from_network(int split_level) {
 		if (i != nums - 1) {
 			fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment+16);
 			if (fragment_ptr == NULL) {
-				dbg_warning("ÔÚ½«packet·Ö¸îÎªÆ¬¶ÎÊ±ÉêÇëÄÚ´æÊ§°Ü.\n");
+				dbg_warning("åœ¨å°†packetåˆ†å‰²ä¸ºç‰‡æ®µæ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 				exit(-1);
 			}
 			*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
@@ -223,10 +223,10 @@ static void get_package_from_network(int split_level) {
 			temp_ptr += length_of_fragment;
 		}
 		else {
-			length_of_fragment = length_of_package - (temp_ptr - package_ptr); //ÕûÊı³ı·¨²»×¼ ¶µ¸öµ×
+			length_of_fragment = length_of_package - (temp_ptr - package_ptr); //æ•´æ•°é™¤æ³•ä¸å‡† å…œä¸ªåº•
 			fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment+16);
 			if (fragment_ptr == NULL) {
-				dbg_warning("ÔÚ½«packet·Ö¸îÎªÆ¬¶ÎÊ±ÉêÇëÄÚ´æÊ§°Ü.\n");
+				dbg_warning("åœ¨å°†packetåˆ†å‰²ä¸ºç‰‡æ®µæ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 				exit(-1);
 			}
 			*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
@@ -235,13 +235,13 @@ static void get_package_from_network(int split_level) {
 			memcpy(fragment_ptr + 2, temp_ptr, length_of_fragment);
 		}
 		
-		dbg_frame("·ÅÈë»º³åÇøÒ»Ö¡ ĞòºÅÎª%d ³¤¶ÈÎª%d.\n",seq,length_of_fragment);
+		dbg_frame("æ”¾å…¥ç¼“å†²åŒºä¸€å¸§ åºå·ä¸º%d é•¿åº¦ä¸º%d.\n",seq,length_of_fragment);
 		send_buffer_lengthes[seq % SENDWINDOW] = length_of_fragment;
 		send_buffer[seq % SENDWINDOW] = fragment_ptr;
 	}
 }
 
-//·¢ËÍack(lazy) Èç¹ûÊÇnakÄÇÃ´isackÎª0 ÊÇack¾ÍÎª1
+//å‘é€ack(lazy) å¦‚æœæ˜¯naké‚£ä¹ˆisackä¸º0 æ˜¯ackå°±ä¸º1
 static void send_ACKNAK(unsigned char seq, int is_ACK) {
 
 	if (isACKNAKdelayed&&enable_ranged_ack) {
@@ -283,65 +283,65 @@ static void send_ACKNAK(unsigned char seq, int is_ACK) {
 static void send_ACKNAK(unsigned char seq, int is_ACK) {
 	unsigned char* frame_ptr = NULL;
 	if (is_ACK == 0) {
-		//·¢ËÍnak¶ÌÖ¡
+		//å‘é€nakçŸ­å¸§
 		frame_ptr = (unsigned char*)malloc(6);
 		if (frame_ptr == NULL) {
-			dbg_warning("ÔÚ·¢ËÍNAK¶ÌÖ¡Ê±ÉêÇëÄÚ´æÊ§°Ü.\n");
+			dbg_warning("åœ¨å‘é€NAKçŸ­å¸§æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 			exit(-1);
 		}
 		*(frame_ptr) = NAK;
 		*(frame_ptr + 1) = seq;
-		dbg_event("»Ø¸´nak¶ÌÖ¡ id:%d.\n", seq);
+		dbg_event("å›å¤nakçŸ­å¸§ id:%d.\n", seq);
 		put_frame(frame_ptr, 2);
 	}
 	else {
-		//·¢ËÍack
+		//å‘é€ack
 		frame_ptr = (unsigned char*)malloc(7);
 		if (frame_ptr == NULL) {
-			dbg_warning("ÔÚ·¢ËÍACK¶ÌÖ¡Ê±ÉêÇëÄÚ´æÊ§°Ü.\n");
+			dbg_warning("åœ¨å‘é€ACKçŸ­å¸§æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 			exit(-1);
 		}
-		//·¢ËÍÆÕÍ¨ack¶ÌÖ¡
+		//å‘é€æ™®é€šackçŸ­å¸§
 		*(frame_ptr) = ACK;
 		*(frame_ptr + 1) = seq;
-		dbg_event("»Ø¸´ack¶ÌÖ¡ id:%d.\n", seq);
+		dbg_event("å›å¤ackçŸ­å¸§ id:%d.\n", seq);
 		put_frame(frame_ptr, 2);
 
 	}
 }
 */
 
-//µ±½ÓÊÜµ½ack»òÕßnakµÄ´¦Àíº¯Êı
+//å½“æ¥å—åˆ°ackæˆ–è€…nakçš„å¤„ç†å‡½æ•°
 static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char seq2) {
 	if (between(send_lowerbound,send_upperbound,seq1)) {
 		if (flag & NAK) {
-			//½ÓÊÕµ½µÄÊÇnak
+			//æ¥æ”¶åˆ°çš„æ˜¯nak
 			unsigned char* frame_ptr = send_buffer[seq1 % SENDWINDOW];
 			if (frame_ptr == NULL) {
-				dbg_event("½ÓÊÕµ½ÁËÒ»¸öĞòºÅÎª%d µÄnak,¿ÉÊÇ¶ÔÓ¦Ö¡ÒÑ±»È·ÈÏ.\n", seq1);
+				dbg_event("æ¥æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º%d çš„nak,å¯æ˜¯å¯¹åº”å¸§å·²è¢«ç¡®è®¤.\n", seq1);
 				return;
 			}
-			is_sent[seq1%SENDWINDOW] = 0; //ÓÉÒÔºóµÄsend_frame_to_physicalº¯ÊıÖØĞÂ·¢ËÍ
-			dbg_event("½ÓÊÕµ½ÁËÒ»¸öĞòºÅÎª%d µÄnak,µÈ´ıÏÂ´ÎÎïÀí²ãreadyÊ±·¢ËÍ.\n", seq1);
+			is_sent[seq1%SENDWINDOW] = 0; //ç”±ä»¥åçš„send_frame_to_physicalå‡½æ•°é‡æ–°å‘é€
+			dbg_event("æ¥æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º%d çš„nak,ç­‰å¾…ä¸‹æ¬¡ç‰©ç†å±‚readyæ—¶å‘é€.\n", seq1);
 			return;
 		}
 		else {
 			if (flag & ACK) {
 				if (!(flag & ACK_RANGED)) {
-					//Èç¹û²»ÊÇ·¶Î§ack
+					//å¦‚æœä¸æ˜¯èŒƒå›´ack
 					seq2 = seq1;
 				}
 				for (unsigned char i = seq1; (i != (unsigned char)(seq2+1)) && (i != send_upperbound); i++) {
 					dbg_event("i: %d seq1: %d, seq2:%d  sendupper: %d\n", i, seq1, seq2, send_upperbound);
 					if (send_buffer[i % SENDWINDOW] == NULL) {
-						dbg_event("½ÓÊÕµ½ÁËÒ»¸öĞòºÅÎª%d µÄack,¿ÉÊÇ¶ÔÓ¦Ö¡ÒÑ±»È·ÈÏ.\n", i);
+						dbg_event("æ¥æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º%d çš„ack,å¯æ˜¯å¯¹åº”å¸§å·²è¢«ç¡®è®¤.\n", i);
 					}
 					else {
 						free(send_buffer[i % SENDWINDOW]);
 						send_buffer[i % SENDWINDOW] = NULL;
 						send_buffer_lengthes[i % SENDWINDOW] = 0;
-						is_sent[i % SENDWINDOW] = 1; //·ÀÖ¹send_frame_to_physicalº¯Êı´íÎóµØ¶ÁÈ¡¿ÕÖ¸Õë
-						dbg_event("½ÓÊÕµ½ÁËÒ»¸öĞòºÅÎª%d µÄack,¶ÔÓ¦Ö¡ÒÑ±»È·ÈÏ.\n", i);
+						is_sent[i % SENDWINDOW] = 1; //é˜²æ­¢send_frame_to_physicalå‡½æ•°é”™è¯¯åœ°è¯»å–ç©ºæŒ‡é’ˆ
+						dbg_event("æ¥æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º%d çš„ack,å¯¹åº”å¸§å·²è¢«ç¡®è®¤.\n", i);
 						stop_timer(i % SENDWINDOW);
 					}
 				}
@@ -350,7 +350,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 					if (send_buffer[i % SENDWINDOW] != NULL)break;
 				}
 				unsigned char step = i - send_lowerbound;
-				dbg_event("Ô­ sendlowerbound %d ÏòÇ°»¬¶¯ %d ÏÖsendlowerbound: %d\n", send_lowerbound,step,send_lowerbound+step);
+				dbg_event("åŸ sendlowerbound %d å‘å‰æ»‘åŠ¨ %d ç°sendlowerbound: %d\n", send_lowerbound,step,send_lowerbound+step);
 				send_lowerbound += step;
 			}
 		}
@@ -358,31 +358,31 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 	
 }
 
-//µ±µÃµ½framereceivedÊÂ¼şÊ±µ÷ÓÃ
+//å½“å¾—åˆ°framereceivedäº‹ä»¶æ—¶è°ƒç”¨
 static void got_frame(void) {
 	number_of_received_frames += 1;
 	unsigned char* frame_ptr = (unsigned char*)malloc(2048);
 	//unsigned char watch[2048];
 	//unsigned char* frame_ptr = watch;
 	if (frame_ptr == NULL) {
-		dbg_warning("ÔÚÊÔÍ¼»ñµÃÎïÀí²ã½ÓÊÕÖ¡Ê±ÉêÇëÄÚ´æÊ§°Ü.\n");
+		dbg_warning("åœ¨è¯•å›¾è·å¾—ç‰©ç†å±‚æ¥æ”¶å¸§æ—¶ç”³è¯·å†…å­˜å¤±è´¥.\n");
 		exit(-1);
 	}
 	int length_of_frame = recv_frame(frame_ptr, 2048);
 	//lprintf("length_of_frame %d \n", length_of_frame);
 	if (crc32(frame_ptr, length_of_frame) != 0) {
-		//Ğ£ÑéÊ§°Ü
+		//æ ¡éªŒå¤±è´¥
 		number_of_broken_recived_frames += 1;
 		if (((*frame_ptr) | IS_DATA)&&length_of_frame>6) {
 			unsigned char seq = *(frame_ptr + 1);
-			send_ACKNAK(seq, 0);//²«Ò»²«,µ¥³µ±äÄ¦ÍĞ~
-			dbg_frame("ÊÕµ½ÁËÒ»¸ö×Ô³ÆĞòºÅÎª %d µÄËğ»µÊı¾İÖ¡. ·¢ËÍnak.\n",seq);
+			send_ACKNAK(seq, 0);//æä¸€æ,å•è½¦å˜æ‘©æ‰˜~
+			dbg_frame("æ”¶åˆ°äº†ä¸€ä¸ªè‡ªç§°åºå·ä¸º %d çš„æŸåæ•°æ®å¸§. å‘é€nak.\n",seq);
 		}
 		free(frame_ptr);
 		return;
 	}
-	//½ÓÏÂÀ´ÊÇÕı³£µÄ´¦ÀíÁ÷³Ì
-	if (!((*frame_ptr) & IS_DATA)) { //²»ÊÇdataµÄacknak¶ÌÖ¡
+	//æ¥ä¸‹æ¥æ˜¯æ­£å¸¸çš„å¤„ç†æµç¨‹
+	if (!((*frame_ptr) & IS_DATA)) { //ä¸æ˜¯dataçš„acknakçŸ­å¸§
 		
 		if ((*frame_ptr) & NAK) {
 			recv_ACKNAK(*frame_ptr, *(frame_ptr + 1), *(frame_ptr + 1));
@@ -391,11 +391,11 @@ static void got_frame(void) {
 		}
 		if ((*frame_ptr) & ACK) {
 			if ((*frame_ptr) & ACK_RANGED) {
-				//·¶Î§ack
+				//èŒƒå›´ack
 				recv_ACKNAK(*frame_ptr, *(frame_ptr + 1), *(frame_ptr + 2));
 			}
 			else {
-				//ÆÕÍ¨ack¶ÌÖ¡
+				//æ™®é€šackçŸ­å¸§
 				recv_ACKNAK(*frame_ptr, *(frame_ptr + 1), *(frame_ptr + 1));
 			}
 		}
@@ -403,17 +403,17 @@ static void got_frame(void) {
 		return;
 	}
 
-	//½ÓÏÂÀ´µÄÊÇ´¦ÀíÊı¾İÖ¡µÄ²¿·Ö
-	//´¦Àí´æÔÚÉÓ´øµÄ
+	//æ¥ä¸‹æ¥çš„æ˜¯å¤„ç†æ•°æ®å¸§çš„éƒ¨åˆ†
+	//å¤„ç†å­˜åœ¨æå¸¦çš„
 	if ((*frame_ptr) & IS_PIGGYBACKING) {
 		if (((*frame_ptr) & ACK) && (*frame_ptr) & ACK_RANGED) {
-			//ÊÇ·¶Î§µÄ
+			//æ˜¯èŒƒå›´çš„
 			recv_ACKNAK(*frame_ptr, *(frame_ptr + length_of_frame - 6), *(frame_ptr + length_of_frame - 5));
 			length_of_frame -= 8;
 		}
 		else
 		{
-			//²»ÊÇ·¶Î§µÄ
+			//ä¸æ˜¯èŒƒå›´çš„
 			recv_ACKNAK(*frame_ptr, *(frame_ptr + length_of_frame - 5), *(frame_ptr + length_of_frame - 5));
 			length_of_frame -= 7;
 		}
@@ -425,17 +425,17 @@ static void got_frame(void) {
 	send_ACKNAK(seq, 1);
 	if (!between(recv_lowerbound, recv_upperbound, seq)) {
 		free(frame_ptr);
-		dbg_frame("ÊÕµ½ÁËÒ»¸öĞòºÅÎª %u µÄÖ¡,µ«Õâ²»ÔÚÆÚÍû·¶Î§Ö®ÄÚ ½ÓÊÕÆÚÍû·¶Î§:[%u %u).\n", seq,recv_lowerbound, recv_upperbound);
+		dbg_frame("æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º %u çš„å¸§,ä½†è¿™ä¸åœ¨æœŸæœ›èŒƒå›´ä¹‹å†… æ¥æ”¶æœŸæœ›èŒƒå›´:[%u %u).\n", seq,recv_lowerbound, recv_upperbound);
 		return;
 	}
 	if (recv_buffer[seq % RECVWINDOW] != NULL) {
 		free(frame_ptr);
-		dbg_frame("ÊÕµ½ÁËÒ»¸öĞòºÅÎª %d µÄÖ¡,µ«Õâ¸öĞòºÅµÄÖ¡ÒÑ¾­½ÓÊÕ(ÖØ·¢µÄÖ¡).\n", recv_lowerbound, recv_upperbound);
+		dbg_frame("æ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º %d çš„å¸§,ä½†è¿™ä¸ªåºå·çš„å¸§å·²ç»æ¥æ”¶(é‡å‘çš„å¸§).\n", recv_lowerbound, recv_upperbound);
 		return;
 	}
 	recv_buffer[seq % RECVWINDOW] = frame_ptr;
 	recv_buffer_lengthes[seq % RECVWINDOW] = length_of_frame;
-	dbg_frame("³É¹¦ÊÕµ½ÁËÒ»¸öĞòºÅÎª %d µÄÖ¡, ³¤¶ÈÎª%d. \n",seq,length_of_frame);
+	dbg_frame("æˆåŠŸæ”¶åˆ°äº†ä¸€ä¸ªåºå·ä¸º %d çš„å¸§, é•¿åº¦ä¸º%d. \n",seq,length_of_frame);
 	int i = recv_lowerbound;
 	unsigned char old_upperbound = recv_upperbound;
 	while (i != old_upperbound) {
@@ -454,13 +454,13 @@ static void got_frame(void) {
 				break;
 			}
 			if (((*recv_buffer[j % RECVWINDOW]) & DATA_SPLIT_MASK )!= splitLevel) {
-				dbg_warning("·Ö¸îÊı²»Í¬²½,¼ì²é³ÌĞòÔËĞĞÂß¼­!.\n");
+				dbg_warning("åˆ†å‰²æ•°ä¸åŒæ­¥,æ£€æŸ¥ç¨‹åºè¿è¡Œé€»è¾‘!.\n");
 				exit(-1);
 			}
 		}
 		if (j != i + f)break;
 		
-		//½ÓÏÂÀ´,½«·Ö¸îºóµÄÊı¾İºÏ²¢ÎªÒ»¸öÖ¡
+		//æ¥ä¸‹æ¥,å°†åˆ†å‰²åçš„æ•°æ®åˆå¹¶ä¸ºä¸€ä¸ªå¸§
 		unsigned char* packet_ptr = (unsigned char*)malloc(length+16);
 		unsigned char* temp_ptr = packet_ptr;
 		for (j = i; j != i + f; j++) {
@@ -475,7 +475,7 @@ static void got_frame(void) {
 		put_packet(packet_ptr, length);
 
 		short inner_id = *(short*)packet_ptr;
-		dbg_event("ÒÑ½»¸¶ÍøÂç²ãÒ»¸öpackage ÄÚÖÃidÎª %d ËüµÄÍ·²¿Ö¡idÎª %d .\n", inner_id,i);
+		dbg_event("å·²äº¤ä»˜ç½‘ç»œå±‚ä¸€ä¸ªpackage å†…ç½®idä¸º %d å®ƒçš„å¤´éƒ¨å¸§idä¸º %d .\n", inner_id,i);
 		free(packet_ptr);
 
 		i += f;
@@ -496,7 +496,7 @@ void init(void) {
 
 
 int main(int argc, char** argv) {
-	init(); //³õÊ¼»¯¸÷È«¾Ö±äÁ¿
+	init(); //åˆå§‹åŒ–å„å…¨å±€å˜é‡
 	enable_network_layer();
 	int event, arg;
 	protocol_init(argc, argv);
@@ -510,7 +510,7 @@ int main(int argc, char** argv) {
 				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
 					enable_ranged_ack = 0;
 					SPLIT_LEVEL = 2;
-					dbg_event("*****ÎóÂëÂÊ½Ï¸ß,¹Ø±Õ·¶Î§ack¹¦ÄÜ,½µµÍÖ¡³¤¶È*****\n");
+					dbg_event("*****è¯¯ç ç‡è¾ƒé«˜,å…³é—­èŒƒå›´ackåŠŸèƒ½,é™ä½å¸§é•¿åº¦*****\n");
 				}
 			}
 		}
