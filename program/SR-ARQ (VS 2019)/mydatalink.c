@@ -7,6 +7,11 @@ int isACKNAKranged = 0; //标注被延迟的是不是范围ack
 unsigned char ACKNAKseq1 = 0;//被延迟的序号
 unsigned char ACKNAKseq2 = 0; //在范围ack中用的
 
+int isPackageDelayed = 0;//用于突发帧,采用Nagle算法解决积累数据可能产生的超时问题
+static unsigned char* frame_ptr = NULL;//用于记录合并帧的全局静态指针
+static unsigned char* current_ptr = NULL; //也是用于合并帧的指针
+static unsigned char seq; //用于静态帧的序号
+
 unsigned char* recv_buffer[RECVWINDOW]; //接收缓冲区buffer 只存的是指针,记得全部初始化为NULL
 int recv_buffer_lengthes[RECVWINDOW]; //记录长度 记得别忘了初始化
 unsigned char* send_buffer[SENDWINDOW]; //发送缓冲区buffer
@@ -20,7 +25,7 @@ unsigned char send_lowerbound = 0;//发送窗口序号下界
 unsigned char send_upperbound = 0;//发送窗口序号上界
 
 int SPLIT_LEVEL = 3;//可变帧长对package的分割等级,默认为3,也就是不分割
-static const int fragment_numbers[4] = { 8,4,2,1 }; //每个分割等级应该将一个package分成多少份
+static const int fragment_numbers[6] = { 8,4,2,1,2,3 }; //每个分割等级应该将一个package分成多少份 但是若为4,5的时候,是帧合并
 
 int number_of_received_frames = 0;
 int number_of_broken_recived_frames = 0;
@@ -132,11 +137,6 @@ static void send_frame_to_physical() {
 	}
 	memcpy(frame_to_physical_ptr, frame_ptr, length_of_frame+2);
 	if (!isACKNAKdelayed) {
-		//测试用
-		unsigned char frame_to_physical[1024];
-		memcpy(frame_to_physical, frame_to_physical_ptr, length_of_frame + 2);
-
-
 		put_frame(frame_to_physical_ptr, length_of_frame+2);
 		dbg_frame("已发送序号为 %d 的一帧至物理层. 没有携带ack,nak.\n", *(frame_to_physical_ptr + 1));
 	}
@@ -203,41 +203,74 @@ static void get_package_from_network(int split_level) {
 
 	int length_of_package = get_packet(package_ptr);
 
-	
-	int length_of_fragment = length_of_package / nums;
-	unsigned char* temp_ptr = package_ptr;
-	for (int i = 0; i < nums; i++) {
-		unsigned seq = send_upperbound++;
-		
-		unsigned char* fragment_ptr;
-		if (i != nums - 1) {
-			fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment+16);
-			if (fragment_ptr == NULL) {
-				dbg_warning("在将packet分割为片段时申请内存失败.\n");
+	if (split_level <= 3) {
+		int length_of_fragment = length_of_package / nums;
+		unsigned char* temp_ptr = package_ptr;
+		for (int i = 0; i < nums; i++) {
+			unsigned char seq = send_upperbound++;
+
+			unsigned char* fragment_ptr;
+			if (i != nums - 1) {
+				fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment + 16);
+				if (fragment_ptr == NULL) {
+					dbg_warning("在将packet分割为片段时申请内存失败.\n");
+					exit(-1);
+				}
+				*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
+				*(fragment_ptr + 1) = seq;
+				is_sent[seq % SENDWINDOW] = 0;
+				memcpy(fragment_ptr + 2, temp_ptr, length_of_fragment);
+				temp_ptr += length_of_fragment;
+			}
+			else {
+				length_of_fragment = length_of_package - (temp_ptr - package_ptr); //整数除法不准 兜个底
+				fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment + 16);
+				if (fragment_ptr == NULL) {
+					dbg_warning("在将packet分割为片段时申请内存失败.\n");
+					exit(-1);
+				}
+				*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
+				*(fragment_ptr + 1) = seq;
+				is_sent[seq % SENDWINDOW] = 0;
+				memcpy(fragment_ptr + 2, temp_ptr, length_of_fragment);
+			}
+
+			dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_fragment);
+			send_buffer_lengthes[seq % SENDWINDOW] = length_of_fragment;
+			send_buffer[seq % SENDWINDOW] = fragment_ptr;
+		}
+	}
+	else {
+		static int length_of_frame;
+
+		static int num_of_gotten_package = 0;
+
+		if (isPackageDelayed == 0) {
+			length_of_frame = nums * length_of_package;
+			frame_ptr = (unsigned char*)malloc(2 + length_of_frame + 16);
+			if (frame_ptr == NULL) {
+				dbg_warning("构建大型帧时申请内存失败.\n");
 				exit(-1);
 			}
-			*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
-			*(fragment_ptr + 1) = seq;
-			is_sent[seq%SENDWINDOW] = 0;
-			memcpy(fragment_ptr + 2, temp_ptr, length_of_fragment);
-			temp_ptr += length_of_fragment;
+			current_ptr = frame_ptr+2;
+			seq = send_upperbound++;
+			*frame_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
+			*(frame_ptr + 1) = seq;
+			isPackageDelayed = 1;
+			num_of_gotten_package = 0;
 		}
-		else {
-			length_of_fragment = length_of_package - (temp_ptr - package_ptr); //整数除法不准 兜个底
-			fragment_ptr = (unsigned char*)malloc(2 + length_of_fragment+16);
-			if (fragment_ptr == NULL) {
-				dbg_warning("在将packet分割为片段时申请内存失败.\n");
-				exit(-1);
-			}
-			*fragment_ptr = IS_DATA | (DATA_SPLIT_MASK & split_level);
-			*(fragment_ptr + 1) = seq;
-			is_sent[seq%SENDWINDOW] = 0;
-			memcpy(fragment_ptr + 2, temp_ptr, length_of_fragment);
+		memcpy(current_ptr, package_ptr, length_of_package);
+		num_of_gotten_package += 1;
+		current_ptr += length_of_package;
+		if (num_of_gotten_package == nums) {
+			is_sent[seq % SENDWINDOW] = 0;
+			dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
+			send_buffer_lengthes[seq % SENDWINDOW] = length_of_frame;
+			send_buffer[seq % SENDWINDOW] = frame_ptr;
+			frame_ptr = current_ptr = NULL;
+			num_of_gotten_package = 0;
+			isPackageDelayed = 0;
 		}
-		
-		dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n",seq,length_of_fragment);
-		send_buffer_lengthes[seq % SENDWINDOW] = length_of_fragment;
-		send_buffer[seq % SENDWINDOW] = fragment_ptr;
 	}
 }
 
@@ -276,40 +309,11 @@ static void send_ACKNAK(unsigned char seq, int is_ACK) {
 	isACKNAKranged = 0;
 	ACK_or_NAK = is_ACK;
 	ACKNAKseq1 = seq;
+	if(is_ACK==0)flush_ACKNAK_delay();
 	start_ack_timer(ACK_TIMER_TIMEOUT);
 }
 
-/*
-static void send_ACKNAK(unsigned char seq, int is_ACK) {
-	unsigned char* frame_ptr = NULL;
-	if (is_ACK == 0) {
-		//发送nak短帧
-		frame_ptr = (unsigned char*)malloc(6);
-		if (frame_ptr == NULL) {
-			dbg_warning("在发送NAK短帧时申请内存失败.\n");
-			exit(-1);
-		}
-		*(frame_ptr) = NAK;
-		*(frame_ptr + 1) = seq;
-		dbg_event("回复nak短帧 id:%d.\n", seq);
-		put_frame(frame_ptr, 2);
-	}
-	else {
-		//发送ack
-		frame_ptr = (unsigned char*)malloc(7);
-		if (frame_ptr == NULL) {
-			dbg_warning("在发送ACK短帧时申请内存失败.\n");
-			exit(-1);
-		}
-		//发送普通ack短帧
-		*(frame_ptr) = ACK;
-		*(frame_ptr + 1) = seq;
-		dbg_event("回复ack短帧 id:%d.\n", seq);
-		put_frame(frame_ptr, 2);
 
-	}
-}
-*/
 
 //当接受到ack或者nak的处理函数
 static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char seq2) {
@@ -354,6 +358,18 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 				send_lowerbound += step;
 			}
 		}
+	}
+	static int nums_of_received_ack = 0;
+	if (isPackageDelayed&&nums_of_received_ack%1==0) {
+		dbg_event("由于nagle超时导致的发送\n");
+		int length_of_frame = current_ptr - frame_ptr - 2;
+		is_sent[seq % SENDWINDOW] = 0;
+		dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
+		send_buffer_lengthes[seq % SENDWINDOW] = length_of_frame;
+		send_buffer[seq % SENDWINDOW] = frame_ptr;
+		frame_ptr = current_ptr = NULL;
+		isPackageDelayed = 0;
+		send_frame_to_physical();
 	}
 	
 }
@@ -436,49 +452,74 @@ static void got_frame(void) {
 	recv_buffer[seq % RECVWINDOW] = frame_ptr;
 	recv_buffer_lengthes[seq % RECVWINDOW] = length_of_frame;
 	dbg_frame("成功收到了一个序号为 %d 的帧, 长度为%d. \n",seq,length_of_frame);
-	int i = recv_lowerbound;
+	unsigned char i = recv_lowerbound;
 	unsigned char old_upperbound = recv_upperbound;
 	while (i != old_upperbound) {
 		frame_ptr = recv_buffer[i % RECVWINDOW];
 		if (frame_ptr == NULL)break;
 		unsigned char splitLevel = (*frame_ptr) & DATA_SPLIT_MASK;
-		int f;
-		if (splitLevel < 4)f = fragment_numbers[(unsigned char)splitLevel];
-		else break;
-		if (!between(recv_lowerbound, recv_upperbound, i+f-1))break;
-		int length = 0;
-		int j = i;
-		for (; j != i + f; j++) {
-			length += recv_buffer_lengthes[j % RECVWINDOW];
-			if (recv_buffer[j % RECVWINDOW] == NULL) {
-				break;
-			}
-			if (((*recv_buffer[j % RECVWINDOW]) & DATA_SPLIT_MASK )!= splitLevel) {
-				dbg_warning("分割数不同步,检查程序运行逻辑!.\n");
-				exit(-1);
-			}
-		}
-		if (j != i + f)break;
 		
-		//接下来,将分割后的数据合并为一个帧
-		unsigned char* packet_ptr = (unsigned char*)malloc(length+16);
-		unsigned char* temp_ptr = packet_ptr;
-		for (j = i; j != i + f; j++) {
-			int length_of_fragment = recv_buffer_lengthes[j % RECVWINDOW];
-			memcpy(temp_ptr, recv_buffer[j % RECVWINDOW]+2, length_of_fragment);
-			temp_ptr += length_of_fragment;
-			free(recv_buffer[j % RECVWINDOW]);
-			recv_buffer[j % RECVWINDOW] = NULL;
+		if (splitLevel < 4) {
+			int f = fragment_numbers[(unsigned char)splitLevel];
+
+			if (!between(recv_lowerbound, recv_upperbound, i + f - 1))break;
+			int length = 0;
+			int j = i;
+			for (; j != i + f; j++) {
+				length += recv_buffer_lengthes[j % RECVWINDOW];
+				if (recv_buffer[j % RECVWINDOW] == NULL) {
+					break;
+				}
+				if (((*recv_buffer[j % RECVWINDOW]) & DATA_SPLIT_MASK) != splitLevel) {
+					dbg_warning("分割数不同步,检查程序运行逻辑!.\n");
+					exit(-1);
+				}
+			}
+			if (j != i + f)break;
+
+			//接下来,将分割后的数据合并为一个帧
+			unsigned char* packet_ptr = (unsigned char*)malloc(length + 16);
+			unsigned char* temp_ptr = packet_ptr;
+			for (j = i; j != i + f; j++) {
+				int length_of_fragment = recv_buffer_lengthes[j % RECVWINDOW];
+				memcpy(temp_ptr, recv_buffer[j % RECVWINDOW] + 2, length_of_fragment);
+				temp_ptr += length_of_fragment;
+				free(recv_buffer[j % RECVWINDOW]);
+				recv_buffer[j % RECVWINDOW] = NULL;
+			}
+			recv_lowerbound += f;
+			recv_upperbound += f;
+			put_packet(packet_ptr, length);
+
+			short inner_id = *(short*)packet_ptr;
+			dbg_event("已交付网络层一个package 内置id为 %d 它的头部帧id为 %d .\n", inner_id, i);
+			free(packet_ptr);
+			i += f;
 		}
-		recv_lowerbound += f;
-		recv_upperbound += f;
-		put_packet(packet_ptr, length);
-
-		short inner_id = *(short*)packet_ptr;
-		dbg_event("已交付网络层一个package 内置id为 %d 它的头部帧id为 %d .\n", inner_id,i);
-		free(packet_ptr);
-
-		i += f;
+		else
+		{
+			//unsigned char watch[10240];
+			//int length=recv_buffer_lengthes[i % RECVWINDOW];
+			//memcpy(watch, frame_ptr, length);
+			unsigned char* current_ptr = frame_ptr + 2;
+			unsigned char* end_ptr=current_ptr+ recv_buffer_lengthes[i % RECVWINDOW];
+			while (current_ptr < end_ptr) {
+				
+				
+				short inner_id = *(short*)current_ptr;
+				//printf("已交付网络层一个package 内置id为 %d 它的头部帧id为 %d .\n", inner_id, i);
+				//printf("突发帧长度:%d.\n", end_ptr - current_ptr);
+				put_packet(current_ptr, LENGTH_OF_PACKAGE);
+				current_ptr += LENGTH_OF_PACKAGE;
+			}
+			i += 1;
+			free(recv_buffer[i % RECVWINDOW]);
+			recv_buffer[i % RECVWINDOW] = NULL;
+			recv_lowerbound += 1;
+			recv_upperbound += 1;
+			send_frame_to_physical();
+		}
+		
 	}
 
 }
@@ -502,17 +543,32 @@ int main(int argc, char** argv) {
 	protocol_init(argc, argv);
 	lprintf("Designed by Rivers Jin, build: " __DATE__"  "__TIME__"\n");
 	int is_phsical_ready = 1;
+
+	static int enable_burst_frame = 0;
 	while (1) {
 		//lprintf("sendlower:%ud sendupper :%ud recvlower:%ud recvupper:%ud \n",send_lowerbound,send_upperbound,recv_lowerbound,recv_upperbound);
 		event = wait_for_event(&arg);
-		if (number_of_received_frames > 100) {
+		static int is_judged = 0; //只评估一次就好
+		if (number_of_received_frames > 10 &&is_judged==0) {
+
 			if (enable_ranged_ack) {
 				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
 					enable_ranged_ack = 0;
 					SPLIT_LEVEL = 2;
-					dbg_event("*****误码率较高,关闭范围ack功能,降低帧长度*****\n");
+					printf("*****误码率较高,关闭范围ack功能,降低帧长度*****\n");
+				}
+				else if (enable_burst_frame == 0 && enable_ranged_ack == 1) {
+					if (number_of_broken_recived_frames == 0) {
+						enable_burst_frame = 1;
+						SPLIT_LEVEL = 5;
+						printf("*****误码率较低,启动帧突发功能,提高帧长度*****\n");
+					}
+					else {
+						printf("*****信道评估完成,没有需要更改的地方*****\n");
+					}
 				}
 			}
+			is_judged = 1;
 		}
 		switch (event)
 		{
@@ -530,6 +586,17 @@ int main(int argc, char** argv) {
 			break;
 		case ACK_TIMEOUT:
 			flush_ACKNAK_delay();
+			if (isPackageDelayed) {
+				printf("由于ack超时导致的发送\n");
+				int length_of_frame = current_ptr - frame_ptr - 2;
+				is_sent[seq % SENDWINDOW] = 0;
+				dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
+				send_buffer_lengthes[seq % SENDWINDOW] = length_of_frame;
+				send_buffer[seq % SENDWINDOW] = frame_ptr;
+				frame_ptr = current_ptr = NULL;
+				isPackageDelayed = 0;
+				send_frame_to_physical();
+			}
 			break;
 		default:
 			break;
