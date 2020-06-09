@@ -193,6 +193,12 @@ static void get_package_from_network(int split_level) {
 		//dbg_warning("当前发送序号下界为 %d 上界为 %d 可用数为 %d 当前分割登记下需要 %d 个可用序号 不能获取packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
 		return;
 	}
+	if (split_level <= 3) {
+		if (nums > available_nums)return;
+	}
+	else {
+		if (available_nums <= 0)return;
+	}
 	unsigned char* package_ptr = (unsigned char*)malloc(2048);
 	if (package_ptr == NULL) {
 		dbg_warning("在获取网络层packet时申请内存失败.\n");
@@ -371,7 +377,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 		isPackageDelayed = 0;
 		send_frame_to_physical();
 	}
-	
+	nums_of_received_ack += 1;
 }
 
 //当得到framereceived事件时调用
@@ -517,7 +523,7 @@ static void got_frame(void) {
 			recv_buffer[i % RECVWINDOW] = NULL;
 			recv_lowerbound += 1;
 			recv_upperbound += 1;
-			send_frame_to_physical();
+			
 		}
 		
 	}
@@ -587,7 +593,7 @@ int main(int argc, char** argv) {
 		case ACK_TIMEOUT:
 			flush_ACKNAK_delay();
 			if (isPackageDelayed) {
-				printf("由于ack超时导致的发送\n");
+				dbg_event("由于ack超时导致的发送\n");
 				int length_of_frame = current_ptr - frame_ptr - 2;
 				is_sent[seq % SENDWINDOW] = 0;
 				dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
