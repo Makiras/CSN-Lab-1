@@ -555,7 +555,7 @@ int main(int argc, char** argv) {
 		//lprintf("sendlower:%ud sendupper :%ud recvlower:%ud recvupper:%ud \n",send_lowerbound,send_upperbound,recv_lowerbound,recv_upperbound);
 		event = wait_for_event(&arg);
 		static int is_judged = 0; //只评估一次就好
-		if (number_of_received_frames > 10 &&is_judged==0) {
+		if (number_of_received_frames > 100 &&is_judged==0) {
 
 			if (enable_ranged_ack) {
 				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
