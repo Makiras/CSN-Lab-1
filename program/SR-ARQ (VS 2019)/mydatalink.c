@@ -25,7 +25,7 @@ unsigned char send_lowerbound = 0;//发送窗口序号下界
 unsigned char send_upperbound = 0;//发送窗口序号上界
 
 int SPLIT_LEVEL = 3;//可变帧长对package的分割等级,默认为3,也就是不分割
-static const int fragment_numbers[6] = { 8,4,2,1,2,3 }; //每个分割等级应该将一个package分成多少份 但是若为4,5的时候,是帧合并
+static const int fragment_numbers[6] = { 8,4,2,1,2,4 }; //每个分割等级应该将一个package分成多少份 但是若为4,5的时候,是帧合并
 
 int number_of_received_frames = 0;
 int number_of_broken_recived_frames = 0;
@@ -189,7 +189,7 @@ static void data_timer_timeout(unsigned char timer_id) {
 static void get_package_from_network(int split_level) {
 	int nums = fragment_numbers[split_level];
 	unsigned char available_nums = number_of_available_send_seq();
-	if (nums > available_nums) {
+	if (nums > available_nums&&split_level<=3||available_nums==0) {
 		//dbg_warning("当前发送序号下界为 %d 上界为 %d 可用数为 %d 当前分割登记下需要 %d 个可用序号 不能获取packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
 		return;
 	}
