@@ -25,7 +25,7 @@ unsigned char send_lowerbound = 0;//发送窗口序号下界
 unsigned char send_upperbound = 0;//发送窗口序号上界
 
 int SPLIT_LEVEL = 3;//可变帧长对package的分割等级,默认为3,也就是不分割
-static const int fragment_numbers[6] = { 8,4,2,1,2,4 }; //每个分割等级应该将一个package分成多少份 但是若为4,5的时候,是帧合并
+static const int fragment_numbers[6] = { 8,4,2,1,2,3 }; //每个分割等级应该将一个package分成多少份 但是若为4,5的时候,是帧合并
 
 int number_of_received_frames = 0;
 int number_of_broken_recived_frames = 0;
@@ -366,7 +366,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 		}
 	}
 	static int nums_of_received_ack = 0;
-	if (isPackageDelayed&&nums_of_received_ack%1==0) {
+	if (isPackageDelayed&&nums_of_received_ack%2==0) {
 		dbg_event("由于nagle超时导致的发送\n");
 		int length_of_frame = current_ptr - frame_ptr - 2;
 		is_sent[seq % SENDWINDOW] = 0;
@@ -583,6 +583,7 @@ int main(int argc, char** argv) {
 			break;
 		case PHYSICAL_LAYER_READY:
 			is_phsical_ready = 1;
+			send_frame_to_physical();
 			break;
 		case FRAME_RECEIVED:
 			got_frame();
