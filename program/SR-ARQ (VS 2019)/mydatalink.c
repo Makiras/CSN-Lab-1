@@ -513,17 +513,17 @@ static void got_frame(void) {
 				
 				
 				short inner_id = *(short*)current_ptr;
-				//printf("已交付网络层一个package 内置id为 %d 它的头部帧id为 %d .\n", inner_id, i);
-				//printf("突发帧长度:%d.\n", end_ptr - current_ptr);
+				dbg_event("已交付网络层一个package 内置id为 %d 它的头部帧id为 %d .\n", inner_id, i);
+				dbg_event("突发帧长度:%d.\n", end_ptr - current_ptr);
 				put_packet(current_ptr, LENGTH_OF_PACKAGE);
 				current_ptr += LENGTH_OF_PACKAGE;
 			}
-			i += 1;
+			
 			free(recv_buffer[i % RECVWINDOW]);
 			recv_buffer[i % RECVWINDOW] = NULL;
 			recv_lowerbound += 1;
 			recv_upperbound += 1;
-			
+			i += 1;
 		}
 		
 	}
