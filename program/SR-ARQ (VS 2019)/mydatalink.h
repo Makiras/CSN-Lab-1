@@ -30,5 +30,7 @@
 
 
 /* 一个优秀的协议延时应该由程序自己得出,但是在理论计算和实际最佳值不一定是完全对应的,所以在加一个偏置值,可以在跑通之后慢慢调试 */
-#define DATA_TIMER_TIMEOUT 4000 //单位是ms
-#define ACK_TIMER_TIMEOUT 200
+#define DATA_TIMER_TIMEOUT 3000 //单位是ms
+#define ACK_TIMER_TIMEOUT 1000
+
+#define LENGTH_OF_PACKAGE 256 //一个分组的长度
