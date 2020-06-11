@@ -197,7 +197,7 @@ static void get_package_from_network(int split_level) {
 		if (nums > available_nums)return;
 	}
 	else {
-		if (available_nums <= 0)return;
+		if (available_nums <= 1)return;
 	}
 	unsigned char* package_ptr = (unsigned char*)malloc(2048);
 	if (package_ptr == NULL) {
@@ -357,7 +357,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 				}
 				unsigned char i;
 				for (i = send_lowerbound; i != send_upperbound; i++) {
-					if (send_buffer[i % SENDWINDOW] != NULL)break;
+					if (send_buffer[i % SENDWINDOW] != NULL&&is_sent[i%SENDWINDOW]==1)break;
 				}
 				unsigned char step = i - send_lowerbound;
 				dbg_event("原 sendlowerbound %d 向前滑动 %d 现sendlowerbound: %d\n", send_lowerbound,step,send_lowerbound+step);
