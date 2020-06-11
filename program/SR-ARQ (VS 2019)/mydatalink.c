@@ -189,10 +189,7 @@ static void data_timer_timeout(unsigned char timer_id) {
 static void get_package_from_network(int split_level) {
 	int nums = fragment_numbers[split_level];
 	unsigned char available_nums = number_of_available_send_seq();
-	if (nums > available_nums&&split_level<=3||available_nums==0) {
-		//dbg_warning("当前发送序号下界为 %d 上界为 %d 可用数为 %d 当前分割登记下需要 %d 个可用序号 不能获取packet.\n", send_lowerbound, send_upperbound, available_nums, nums);
-		return;
-	}
+	
 	if (split_level <= 3) {
 		if (nums > available_nums)return;
 	}
@@ -272,12 +269,15 @@ static void get_package_from_network(int split_level) {
 			is_sent[seq % SENDWINDOW] = 0;
 			dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
 			send_buffer_lengthes[seq % SENDWINDOW] = length_of_frame;
+			dbg_frame("突发帧正常发出 length of frame:%d \n", length_of_frame);
 			send_buffer[seq % SENDWINDOW] = frame_ptr;
 			frame_ptr = current_ptr = NULL;
 			num_of_gotten_package = 0;
 			isPackageDelayed = 0;
 		}
 	}
+
+	free(package_ptr);
 }
 
 //发送ack(lazy) 如果是nak那么isack为0 是ack就为1
@@ -373,6 +373,7 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 		dbg_frame("放入缓冲区一帧 序号为%d 长度为%d.\n", seq, length_of_frame);
 		send_buffer_lengthes[seq % SENDWINDOW] = length_of_frame;
 		send_buffer[seq % SENDWINDOW] = frame_ptr;
+		dbg_frame("突发帧nagle交付 length of frame:%d \n", length_of_frame);
 		frame_ptr = current_ptr = NULL;
 		isPackageDelayed = 0;
 		send_frame_to_physical();
@@ -492,6 +493,7 @@ static void got_frame(void) {
 				temp_ptr += length_of_fragment;
 				free(recv_buffer[j % RECVWINDOW]);
 				recv_buffer[j % RECVWINDOW] = NULL;
+				recv_buffer_lengthes[j % RECVWINDOW] = 0;
 			}
 			recv_lowerbound += f;
 			recv_upperbound += f;
@@ -521,6 +523,7 @@ static void got_frame(void) {
 			
 			free(recv_buffer[i % RECVWINDOW]);
 			recv_buffer[i % RECVWINDOW] = NULL;
+			recv_buffer_lengthes[i % RECVWINDOW] = 0;
 			recv_lowerbound += 1;
 			recv_upperbound += 1;
 			i += 1;
@@ -555,7 +558,7 @@ int main(int argc, char** argv) {
 		//lprintf("sendlower:%ud sendupper :%ud recvlower:%ud recvupper:%ud \n",send_lowerbound,send_upperbound,recv_lowerbound,recv_upperbound);
 		event = wait_for_event(&arg);
 		static int is_judged = 0; //只评估一次就好
-		if (number_of_received_frames > 100 &&is_judged==0) {
+		if (number_of_received_frames > 10 &&is_judged==0) {
 
 			if (enable_ranged_ack) {
 				if ((float)number_of_broken_recived_frames / number_of_received_frames > 0.1) {
@@ -602,6 +605,7 @@ int main(int argc, char** argv) {
 				send_buffer[seq % SENDWINDOW] = frame_ptr;
 				frame_ptr = current_ptr = NULL;
 				isPackageDelayed = 0;
+				dbg_frame("突发帧ack超时发出 length of frame:%d \n", length_of_frame);
 				send_frame_to_physical();
 			}
 			break;
