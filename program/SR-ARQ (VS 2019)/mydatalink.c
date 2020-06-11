@@ -357,7 +357,8 @@ static void recv_ACKNAK(unsigned char flag, unsigned char seq1, unsigned char se
 				}
 				unsigned char i;
 				for (i = send_lowerbound; i != send_upperbound; i++) {
-					if (send_buffer[i % SENDWINDOW] != NULL&&is_sent[i%SENDWINDOW]==1)break;
+					if (send_buffer[i % SENDWINDOW] == NULL && is_sent[i % SENDWINDOW] == 1)continue;
+					else break;
 				}
 				unsigned char step = i - send_lowerbound;
 				dbg_event("原 sendlowerbound %d 向前滑动 %d 现sendlowerbound: %d\n", send_lowerbound,step,send_lowerbound+step);
